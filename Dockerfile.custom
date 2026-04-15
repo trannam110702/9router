@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1.7
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+RUN apk --no-cache add python3 make g++ linux-headers
+
+COPY package.json package-lock.json* ./
+RUN npm install --no-audit --no-fund
+
+COPY . ./
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+LABEL org.opencontainers.image.title="9router-custom"
+
+ENV NODE_ENV=production
+ENV PORT=20128
+ENV HOSTNAME=0.0.0.0
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV DATA_DIR=/app/data
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/open-sse ./open-sse
+COPY --from=builder /app/src/mitm ./src/mitm
+COPY --from=builder /app/node_modules/node-forge ./node_modules/node-forge
+
+RUN mkdir -p /app/data && chown -R node:node /app
+
+RUN apk --no-cache add su-exec
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 20128
+
+ENTRYPOINT ["/entrypoint.sh"]
