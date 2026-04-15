@@ -12,7 +12,12 @@ export function claudeToOpenAIRequest(model, body, stream) {
 
   // Max tokens
   if (body.max_tokens) {
-    result.max_tokens = adjustMaxTokens(body);
+    const value = adjustMaxTokens(body);
+    if (/^(gpt-5|o[1-9])/i.test(model)) {
+      result.max_completion_tokens = value;
+    } else {
+      result.max_tokens = value;
+    }
   }
 
   // Temperature
